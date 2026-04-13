@@ -160,9 +160,6 @@ class GameSession {
 
   endRound() {
     this.status = 'ended';
-    this.players.forEach((player) => {
-      player.attemptsLeft = this.maxAttempts;
-    });
   }
 
   resetSession() {

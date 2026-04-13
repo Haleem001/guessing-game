@@ -7,6 +7,9 @@
     <div id="game-container" class="game-layout">
       <aside id="sidebar" class="sidebar">
         <a class="back-link" href="/">Back to Lobby</a>
+        <button id="copy-link-btn" type="button" class="secondary-button sidebar-button">
+          Copy Share Link
+        </button>
         <h2>Players</h2>
         <ul id="player-list" class="player-list"></ul>
         <div id="timer-display" class="timer-display">Time Left: 60s</div>
@@ -19,8 +22,26 @@
             <p class="eyebrow">Room Code</p>
             <h1><%= roomId %></h1>
           </div>
-          <div class="identity-pill">Player: <strong><%= name %></strong></div>
+          <div id="identity-pill" class="identity-pill">
+            Player:
+            <strong><%= name || 'Not joined yet' %></strong>
+          </div>
         </header>
+
+        <section id="join-room-panel" class="control-panel <%= name ? 'hidden' : '' %>">
+          <h3>Join This Room</h3>
+          <p class="panel-copy">Enter your name to join this shared room link.</p>
+          <div class="guess-row">
+            <input
+              type="text"
+              id="joinNameInput"
+              placeholder="Your name"
+              maxlength="24"
+              value="<%= name %>"
+            />
+            <button id="joinRoomBtn" type="button">Join Room</button>
+          </div>
+        </section>
 
         <section id="chat-window" class="chat-window"></section>
 
@@ -46,7 +67,7 @@
     <script>
       const socket = io();
       const roomId = <%- JSON.stringify(roomId) %>;
-      const name = <%- JSON.stringify(name) %>;
+      let currentName = <%- JSON.stringify(name) %>;
 
       const playerList = document.getElementById('player-list');
       const timerDisplay = document.getElementById('timer-display');
@@ -57,6 +78,11 @@
       const statusBanner = document.getElementById('status-banner');
       const startBtn = document.getElementById('startBtn');
       const guessBtn = document.getElementById('guessBtn');
+      const copyLinkBtn = document.getElementById('copy-link-btn');
+      const joinRoomPanel = document.getElementById('join-room-panel');
+      const joinRoomBtn = document.getElementById('joinRoomBtn');
+      const joinNameInput = document.getElementById('joinNameInput');
+      const identityPill = document.getElementById('identity-pill');
       const qInput = document.getElementById('qInput');
       const aInput = document.getElementById('aInput');
       const guessInput = document.getElementById('guessInput');
@@ -67,6 +93,24 @@
         item.innerHTML = message;
         chatWindow.appendChild(item);
         chatWindow.scrollTop = chatWindow.scrollHeight;
+      }
+
+      function updateIdentity() {
+        identityPill.innerHTML = `Player: <strong>${currentName || 'Not joined yet'}</strong>`;
+      }
+
+      function joinRoomWithName() {
+        const nextName = String(joinNameInput?.value || currentName || '').trim();
+
+        if (!nextName) {
+          appendMessage('<strong>Error:</strong> Please enter your name first.', 'warning');
+          return;
+        }
+
+        currentName = nextName;
+        updateIdentity();
+        joinRoomPanel.classList.add('hidden');
+        socket.emit('joinRoom', { roomId, name: currentName });
       }
 
       function updateUI(state) {
@@ -95,7 +139,11 @@
           .join('');
       }
 
-      socket.emit('joinRoom', { roomId, name });
+      updateIdentity();
+
+      if (currentName) {
+        socket.emit('joinRoom', { roomId, name: currentName });
+      }
 
       socket.on('roomState', (state) => {
         updateUI(state);
@@ -142,8 +190,37 @@
       });
 
       socket.on('error', (message) => {
+        if (!currentName) {
+          joinRoomPanel.classList.remove('hidden');
+        }
         appendMessage(`<strong>Error:</strong> ${message}`, 'warning');
       });
+
+      copyLinkBtn.addEventListener('click', async () => {
+        const shareUrl = `${window.location.origin}/game/${encodeURIComponent(roomId)}`;
+
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          appendMessage('<strong>Share link copied.</strong>', 'system');
+        } catch (error) {
+          appendMessage(`<strong>Share this link:</strong> ${shareUrl}`, 'system');
+        }
+      });
+
+      if (joinRoomBtn) {
+        joinRoomBtn.addEventListener('click', () => {
+          joinRoomWithName();
+        });
+      }
+
+      if (joinNameInput) {
+        joinNameInput.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            joinRoomWithName();
+          }
+        });
+      }
 
       startBtn.addEventListener('click', () => {
         const question = qInput.value.trim();

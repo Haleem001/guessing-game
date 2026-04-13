@@ -6,11 +6,7 @@ const renderLobby = (req, res) => {
 
 const renderRoom = (req, res) => {
   const { roomId } = req.params;
-  const { name } = req.query;
-
-  if (!name) {
-    return res.redirect('/');
-  }
+  const { name = '' } = req.query;
 
   res.render('room', {
     title: `Room: ${roomId}`,

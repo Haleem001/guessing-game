@@ -1,0 +1,17 @@
+{
+  "name": "guessing-game",
+  "version": "1.0.0",
+  "description": "Real-time guessing game MVC app for Azure App Service",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ejs": "^5.0.2",
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
+  }
+}

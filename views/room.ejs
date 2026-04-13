@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <%- include('partials/head', { title }) %>
+  </head>
+  <body>
+    <main>
+      <h1>Room: <%= roomId %></h1>
+      <p>Real-time gameplay UI will live here.</p>
+      <a href="/">Back to Lobby</a>
+    </main>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/app.js"></script>
+  </body>
+</html>

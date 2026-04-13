@@ -1,13 +1,21 @@
 const renderLobby = (req, res) => {
   res.render('lobby', {
-    title: 'Guessing Game Lobby',
+    title: 'Join a Game',
   });
 };
 
 const renderRoom = (req, res) => {
+  const { roomId } = req.params;
+  const { name } = req.query;
+
+  if (!name) {
+    return res.redirect('/');
+  }
+
   res.render('room', {
-    title: 'Guessing Game Room',
-    roomId: req.params.roomId,
+    title: `Room: ${roomId}`,
+    roomId,
+    name,
   });
 };
 

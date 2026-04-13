@@ -3,13 +3,165 @@
   <head>
     <%- include('partials/head', { title }) %>
   </head>
-  <body>
-    <main>
-      <h1>Room: <%= roomId %></h1>
-      <p>Real-time gameplay UI will live here.</p>
-      <a href="/">Back to Lobby</a>
-    </main>
+  <body class="room-page">
+    <div id="game-container" class="game-layout">
+      <aside id="sidebar" class="sidebar">
+        <a class="back-link" href="/">Back to Lobby</a>
+        <h2>Players</h2>
+        <ul id="player-list" class="player-list"></ul>
+        <div id="timer-display" class="timer-display">Time Left: 60s</div>
+        <div id="status-banner" class="status-banner">Waiting for players...</div>
+      </aside>
+
+      <main id="main-content" class="main-panel">
+        <header class="room-header">
+          <div>
+            <p class="eyebrow">Room Code</p>
+            <h1><%= roomId %></h1>
+          </div>
+          <div class="identity-pill">Player: <strong><%= name %></strong></div>
+        </header>
+
+        <section id="chat-window" class="chat-window"></section>
+
+        <section id="master-panel" class="control-panel hidden">
+          <h3>Master Controls</h3>
+          <input type="text" id="qInput" placeholder="Enter question" />
+          <input type="text" id="aInput" placeholder="Enter answer" />
+          <button id="startBtn" type="button">Start Game</button>
+        </section>
+
+        <section id="player-panel" class="control-panel">
+          <h3>Players</h3>
+          <div id="current-question" class="question-display">Waiting for Master...</div>
+          <div class="guess-row">
+            <input type="text" id="guessInput" placeholder="Type your guess..." />
+            <button id="guessBtn" type="button">Submit</button>
+          </div>
+        </section>
+      </main>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/js/app.js"></script>
+    <script>
+      const socket = io();
+      const roomId = <%- JSON.stringify(roomId) %>;
+      const name = <%- JSON.stringify(name) %>;
+
+      const playerList = document.getElementById('player-list');
+      const timerDisplay = document.getElementById('timer-display');
+      const chatWindow = document.getElementById('chat-window');
+      const masterPanel = document.getElementById('master-panel');
+      const playerPanel = document.getElementById('player-panel');
+      const currentQuestion = document.getElementById('current-question');
+      const statusBanner = document.getElementById('status-banner');
+      const startBtn = document.getElementById('startBtn');
+      const guessBtn = document.getElementById('guessBtn');
+      const qInput = document.getElementById('qInput');
+      const aInput = document.getElementById('aInput');
+      const guessInput = document.getElementById('guessInput');
+
+      function appendMessage(message, tone = '') {
+        const item = document.createElement('p');
+        item.className = `chat-line ${tone}`.trim();
+        item.innerHTML = message;
+        chatWindow.appendChild(item);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+      }
+
+      function updateUI(state) {
+        const isMaster = state.masterId === socket.id;
+
+        masterPanel.classList.toggle('hidden', !isMaster || state.status === 'playing');
+        playerPanel.classList.toggle('hidden', isMaster || state.status !== 'playing');
+
+        currentQuestion.textContent = state.question
+          ? state.status === 'ended' && state.answer
+            ? `${state.question} (Answer: ${state.answer})`
+            : state.question
+          : 'Waiting for Master...';
+        statusBanner.textContent =
+          state.status === 'playing'
+            ? 'Round in progress'
+            : state.status === 'ended'
+              ? `Round ended${state.answer ? `: ${state.answer}` : ''}`
+              : 'Waiting for players...';
+
+        playerList.innerHTML = state.players
+          .map((player) => {
+            const role = player.isMaster ? '[Master] ' : '';
+            return `<li>${role}${player.name} <span>${player.score} pts | ${player.attemptsLeft} tries</span></li>`;
+          })
+          .join('');
+      }
+
+      socket.emit('joinRoom', { roomId, name });
+
+      socket.on('roomState', (state) => {
+        updateUI(state);
+      });
+
+      socket.on('gameStarted', (state) => {
+        updateUI(state);
+        appendMessage('<strong>Round started.</strong> Question is now live.', 'system');
+      });
+
+      socket.on('timerUpdate', (time) => {
+        timerDisplay.textContent = `Time Left: ${time}s`;
+      });
+
+      socket.on('chatMessage', (msg) => {
+        appendMessage(`<strong>${msg.sender}:</strong> ${msg.text}`, msg.isCorrect ? 'success' : '');
+      });
+
+      socket.on('guessResult', (result) => {
+        if (result.playerId === socket.id || result.player?.id === socket.id) {
+          appendMessage(
+            result.outcome === 'correct'
+              ? '<strong>Correct guess.</strong>'
+              : `Wrong guess. ${result.attemptsLeft} attempts left.`,
+            result.outcome === 'correct' ? 'success' : 'warning'
+          );
+        }
+      });
+
+      socket.on('gameOver', ({ reason, state }) => {
+        updateUI(state);
+        appendMessage(`<strong>Game Over:</strong> ${reason}`, 'system');
+      });
+
+      socket.on('newMasterAssigned', ({ masterName, state }) => {
+        if (state) {
+          updateUI(state);
+        }
+        appendMessage(`<strong>New Master:</strong> ${masterName || 'Unassigned'}`, 'system');
+      });
+
+      socket.on('playerLeft', ({ playerName }) => {
+        appendMessage(`<strong>${playerName}</strong> left the room.`, 'warning');
+      });
+
+      socket.on('error', (message) => {
+        appendMessage(`<strong>Error:</strong> ${message}`, 'warning');
+      });
+
+      startBtn.addEventListener('click', () => {
+        const question = qInput.value.trim();
+        const answer = aInput.value.trim();
+
+        socket.emit('startGame', { roomId, question, answer });
+      });
+
+      guessBtn.addEventListener('click', () => {
+        const guess = guessInput.value.trim();
+
+        if (!guess) {
+          return;
+        }
+
+        socket.emit('submitGuess', { roomId, guess });
+        guessInput.value = '';
+      });
+    </script>
   </body>
 </html>

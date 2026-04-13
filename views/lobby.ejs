@@ -3,12 +3,37 @@
   <head>
     <%- include('partials/head', { title }) %>
   </head>
-  <body>
-    <main>
-      <h1>Guessing Game Lobby</h1>
-      <a href="/room/demo-room">Enter Demo Room</a>
+  <body class="lobby-page">
+    <main class="lobby-shell">
+      <section class="lobby-card">
+        <h1>Join a Guessing Game</h1>
+        <p class="lede">
+          Enter your name and a room code to jump into a live round. The first
+          player becomes the Master and controls the next question.
+        </p>
+
+        <form id="join-form" class="join-form">
+          <label for="name">Your Name</label>
+          <input id="name" name="name" type="text" maxlength="24" required />
+
+          <label for="roomId">Room ID</label>
+          <div class="room-id-row">
+            <input
+              id="roomId"
+              name="roomId"
+              type="text"
+              maxlength="24"
+              required
+            />
+            <button id="generate-room-id" type="button" class="secondary-button">
+              Generate
+            </button>
+          </div>
+
+          <button type="submit">Enter Room</button>
+        </form>
+      </section>
     </main>
-    <script src="/socket.io/socket.io.js"></script>
     <script src="/js/app.js"></script>
   </body>
 </html>

@@ -7,6 +7,6 @@ const {
 const router = express.Router();
 
 router.get('/', renderLobby);
-router.get('/room/:roomId', renderRoom);
+router.get('/game/:roomId', renderRoom);
 
 module.exports = router;

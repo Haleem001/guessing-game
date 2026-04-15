@@ -4,6 +4,7 @@
     <%- include('partials/head', { title }) %>
   </head>
   <body class="room-page">
+    <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
     <div id="game-container" class="game-layout">
       <aside id="sidebar" class="sidebar">
         <a class="back-link" href="/">Back to Lobby</a>
@@ -11,6 +12,7 @@
           Copy Share Link
         </button>
         <h2>Players</h2>
+        <div id="player-count" class="status-chip">0 players connected</div>
         <ul id="player-list" class="player-list"></ul>
         <div id="timer-display" class="timer-display">Time Left: 60s</div>
         <div id="status-banner" class="status-banner">Waiting for players...</div>
@@ -70,8 +72,10 @@
       let currentName = <%- JSON.stringify(name) %>;
 
       const playerList = document.getElementById('player-list');
+      const playerCount = document.getElementById('player-count');
       const timerDisplay = document.getElementById('timer-display');
       const chatWindow = document.getElementById('chat-window');
+      const toastRegion = document.getElementById('toast-region');
       const masterPanel = document.getElementById('master-panel');
       const playerPanel = document.getElementById('player-panel');
       const currentQuestion = document.getElementById('current-question');
@@ -87,23 +91,51 @@
       const aInput = document.getElementById('aInput');
       const guessInput = document.getElementById('guessInput');
 
-      function appendMessage(message, tone = '') {
+      function appendMessage(message, tone = '', weight = '', badge = '') {
         const item = document.createElement('p');
         item.className = `chat-line ${tone}`.trim();
-        item.innerHTML = message;
+        if (weight) {
+          const strong = document.createElement('strong');
+          strong.textContent = `${weight} `;
+          item.appendChild(strong);
+        }
+        if (badge) {
+          const badgeNode = document.createElement('span');
+          badgeNode.className = 'message-badge';
+          badgeNode.textContent = badge;
+          item.appendChild(badgeNode);
+        }
+        item.appendChild(document.createTextNode(message));
         chatWindow.appendChild(item);
         chatWindow.scrollTop = chatWindow.scrollHeight;
       }
 
+      function showToast(message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast-error';
+        toast.textContent = message;
+        toastRegion.appendChild(toast);
+
+        window.setTimeout(() => {
+          toast.classList.add('toast-exit');
+          window.setTimeout(() => {
+            toast.remove();
+          }, 220);
+        }, 2800);
+      }
+
       function updateIdentity() {
-        identityPill.innerHTML = `Player: <strong>${currentName || 'Not joined yet'}</strong>`;
+        identityPill.textContent = 'Player: ';
+        const strong = document.createElement('strong');
+        strong.textContent = currentName || 'Not joined yet';
+        identityPill.appendChild(strong);
       }
 
       function joinRoomWithName() {
         const nextName = String(joinNameInput?.value || currentName || '').trim();
 
         if (!nextName) {
-          appendMessage('<strong>Error:</strong> Please enter your name first.', 'warning');
+          showToast('Please enter your name first.');
           return;
         }
 
@@ -118,6 +150,7 @@
 
         masterPanel.classList.toggle('hidden', !isMaster || state.status === 'playing');
         playerPanel.classList.toggle('hidden', isMaster || state.status !== 'playing');
+        joinRoomPanel.classList.add('hidden');
 
         currentQuestion.textContent = state.question
           ? state.status === 'ended' && state.answer
@@ -130,13 +163,21 @@
             : state.status === 'ended'
               ? `Round ended${state.answer ? `: ${state.answer}` : ''}`
               : 'Waiting for players...';
+        playerCount.textContent = `${state.playerCount} player${state.playerCount === 1 ? '' : 's'} connected`;
 
-        playerList.innerHTML = state.players
-          .map((player) => {
-            const role = player.isMaster ? '[Master] ' : '';
-            return `<li>${role}${player.name} <span>${player.score} pts | ${player.attemptsLeft} tries</span></li>`;
-          })
-          .join('');
+        playerList.replaceChildren();
+        state.players.forEach((player) => {
+          const item = document.createElement('li');
+          const nameBlock = document.createElement('span');
+          nameBlock.textContent = `${player.isMaster ? '[Master] ' : ''}${player.name}`;
+
+          const meta = document.createElement('span');
+          meta.textContent = `${player.score} pts | ${player.attemptsLeft} tries`;
+
+          item.appendChild(nameBlock);
+          item.appendChild(meta);
+          playerList.appendChild(item);
+        });
       }
 
       updateIdentity();
@@ -151,7 +192,7 @@
 
       socket.on('gameStarted', (state) => {
         updateUI(state);
-        appendMessage('<strong>Round started.</strong> Question is now live.', 'system');
+        appendMessage('Question is now live.', 'system', 'Round started.');
       });
 
       socket.on('timerUpdate', (time) => {
@@ -159,41 +200,47 @@
       });
 
       socket.on('chatMessage', (msg) => {
-        appendMessage(`<strong>${msg.sender}:</strong> ${msg.text}`, msg.isCorrect ? 'success' : '');
+        appendMessage(msg.text, msg.isCorrect ? 'success' : '', `${msg.sender}:`);
       });
 
       socket.on('guessResult', (result) => {
         if (result.playerId === socket.id || result.player?.id === socket.id) {
           appendMessage(
             result.outcome === 'correct'
-              ? '<strong>Correct guess.</strong>'
+              ? 'You have won.'
               : `Wrong guess. ${result.attemptsLeft} attempts left.`,
-            result.outcome === 'correct' ? 'success' : 'warning'
+            result.outcome === 'correct' ? 'success' : 'warning',
+            result.outcome === 'correct' ? 'Winner:' : '',
+            result.outcome === 'correct' ? 'Winner' : ''
           );
         }
       });
 
       socket.on('gameOver', ({ reason, state }) => {
         updateUI(state);
-        appendMessage(`<strong>Game Over:</strong> ${reason}`, 'system');
+        const message =
+          state.winnerId === socket.id
+            ? `You have won. The answer was ${state.answer || 'revealed'}.`
+            : reason;
+        appendMessage(message, 'system', 'Game Over:');
       });
 
       socket.on('newMasterAssigned', ({ masterName, state }) => {
         if (state) {
           updateUI(state);
         }
-        appendMessage(`<strong>New Master:</strong> ${masterName || 'Unassigned'}`, 'system');
+        appendMessage(masterName || 'Unassigned', 'system', 'New Master:');
       });
 
       socket.on('playerLeft', ({ playerName }) => {
-        appendMessage(`<strong>${playerName}</strong> left the room.`, 'warning');
+        appendMessage(`${playerName} left the room.`, 'warning');
       });
 
       socket.on('error', (message) => {
         if (!currentName) {
           joinRoomPanel.classList.remove('hidden');
         }
-        appendMessage(`<strong>Error:</strong> ${message}`, 'warning');
+        showToast(message);
       });
 
       copyLinkBtn.addEventListener('click', async () => {
@@ -201,9 +248,9 @@
 
         try {
           await navigator.clipboard.writeText(shareUrl);
-          appendMessage('<strong>Share link copied.</strong>', 'system');
+          appendMessage('Share link copied.', 'system');
         } catch (error) {
-          appendMessage(`<strong>Share this link:</strong> ${shareUrl}`, 'system');
+          appendMessage(shareUrl, 'system', 'Share this link:');
         }
       });
 

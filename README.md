@@ -19,7 +19,6 @@ Players join a shared room, one player becomes the game master, and the rest try
 - Session cleanup when all players leave
 - HTTP rate limiting
 - Structured logging with `error`, `info`, and `debug` levels
-- Azure-ready `web.config` for Windows App Service deployments
 
 ## Stack
 
@@ -38,7 +37,6 @@ routes/
 views/
 public/
 server.js
-web.config
 ```
 
 ## How It Works

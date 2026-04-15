@@ -64,7 +64,7 @@ class GameSession {
 
     this.syncMasterRole();
 
-    if (this.players.length < 2 && this.status === 'playing') {
+    if (!this.canStartGame() && this.status === 'playing') {
       this.endRound();
       this.status = 'waiting';
     }

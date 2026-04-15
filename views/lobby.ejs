@@ -6,11 +6,22 @@
   <body class="lobby-page">
     <main class="lobby-shell">
       <section class="lobby-card">
-        <h1>Join a Guessing Game</h1>
+        <h1>Create a game or join one</h1>
         <p class="lede">
-          Enter your name and a room code to jump into a live round. The first
-          player becomes the Master and controls the next question.
+          Generate a new room code to host, or enter a code from a friend to
+          join.
         </p>
+
+        <div class="lobby-options">
+          <article class="option-card">
+            <h2>Create</h2>
+            <p>Generate a new room code and share it.</p>
+          </article>
+          <article class="option-card">
+            <h2>Join</h2>
+            <p>Enter a room code you already have.</p>
+          </article>
+        </div>
 
         <form id="join-form" class="join-form">
           <label for="name">Your Name</label>
@@ -26,11 +37,11 @@
               required
             />
             <button id="generate-room-id" type="button" class="secondary-button">
-              Generate
+              Generate New Code
             </button>
           </div>
 
-          <button type="submit">Enter Room</button>
+          <button type="submit">Continue to Room</button>
         </form>
       </section>
     </main>

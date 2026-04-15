@@ -217,6 +217,7 @@ module.exports = (io) => {
       }
 
       const previousMasterId = session.getCurrentMaster()?.id || null;
+      const wasPlaying = session.status === 'playing';
       const removedPlayer = session.removePlayer(socket.id);
 
       if (!removedPlayer) {
@@ -241,6 +242,13 @@ module.exports = (io) => {
       });
 
       emitRoomState(io, roomId);
+
+      if (wasPlaying && session.status === 'waiting') {
+        io.to(roomId).emit('roundCancelled', {
+          reason: 'Round cancelled because there are no longer enough players to continue.',
+          state: session.getPublicState(),
+        });
+      }
 
       if (session.getCurrentMaster()?.id !== previousMasterId) {
         emitNewMasterAssigned(io, roomId, session);

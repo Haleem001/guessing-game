@@ -122,6 +122,11 @@ module.exports = (io) => {
       const previousMasterId = session.getCurrentMaster()?.id || null;
 
       try {
+        if (session.status === 'playing') {
+          socket.emit('error', 'You cannot join while a game is in progress.');
+          return;
+        }
+
         session.addPlayer({ id: socket.id, name: normalizedName });
         socket.join(normalizedRoomId);
         socketRooms[socket.id] = normalizedRoomId;

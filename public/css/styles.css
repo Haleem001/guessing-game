@@ -26,6 +26,16 @@ body {
   background: var(--bg);
 }
 
+.toast-region {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 30;
+  display: grid;
+  gap: 10px;
+  width: min(92vw, 320px);
+}
+
 .lobby-page,
 .room-page {
   padding: 24px;
@@ -206,6 +216,7 @@ button:hover {
 }
 
 .timer-display,
+.status-chip,
 .status-banner,
 .identity-pill,
 .question-display {
@@ -213,6 +224,12 @@ button:hover {
   border-radius: 12px;
   border: 1px solid var(--border);
   background: #fff;
+}
+
+.status-chip {
+  font-size: 0.92rem;
+  color: var(--muted);
+  background: var(--surface-soft);
 }
 
 .timer-display {
@@ -271,18 +288,52 @@ button:hover {
 }
 
 .chat-line.system {
-  color: var(--accent-dark);
-  background: var(--surface-alt);
+  width: 100%;
+  margin-inline: auto;
+  text-align: center;
+  color: var(--muted);
+  background: transparent;
+  font-style: italic;
 }
 
 .chat-line.success {
   color: var(--success);
   background: #eaf4ef;
+  border: 1px solid rgba(37, 104, 77, 0.16);
 }
 
 .chat-line.warning {
   color: var(--warning);
   background: #f8efe2;
+}
+
+.message-badge {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(37, 104, 77, 0.14);
+  color: var(--success);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.toast-error {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(159, 47, 47, 0.22);
+  background: #fff1f1;
+  color: #8f2424;
+  box-shadow: 0 10px 22px rgba(80, 20, 20, 0.12);
+  animation: toast-in 180ms ease-out;
+}
+
+.toast-exit {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 180ms ease, transform 180ms ease;
 }
 
 .control-panel {
@@ -312,6 +363,18 @@ button:hover {
   display: none;
 }
 
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 900px) {
   .game-layout {
     grid-template-columns: 1fr;
@@ -331,6 +394,12 @@ button:hover {
   .lobby-page,
   .room-page {
     padding: 16px;
+  }
+
+  .toast-region {
+    top: 12px;
+    right: 12px;
+    width: calc(100vw - 24px);
   }
 
   .lobby-card,

@@ -225,6 +225,11 @@
         appendMessage(message, 'system', 'Game Over:');
       });
 
+      socket.on('roundCancelled', ({ reason, state }) => {
+        updateUI(state);
+        appendMessage(reason, 'system', 'Round cancelled:');
+      });
+
       socket.on('newMasterAssigned', ({ masterName, state }) => {
         if (state) {
           updateUI(state);

@@ -73,12 +73,12 @@ class GameSession {
   }
 
   canStartGame() {
-    return this.players.length >= 2;
+    return this.players.length >= 3;
   }
 
   startRound(question, answer) {
     if (!this.canStartGame()) {
-      throw new Error('At least 2 players are required to start the game.');
+      throw new Error('At least 3 players are required to start the game.');
     }
 
     if (!question || !answer) {

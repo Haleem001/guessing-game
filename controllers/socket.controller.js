@@ -1,4 +1,5 @@
 const GameSession = require('../models/gamesession.model.js');
+const logger = require('../utils/logger');
 
 const sessions = {};
 const roomTimers = {};
@@ -107,13 +108,19 @@ function startRoundTimer(io, roomId) {
 
 module.exports = (io) => {
   io.on('connection', (socket) => {
-    console.log(`User Connected: ${socket.id}`);
+    logger.info('Socket connected', {
+      socketId: socket.id,
+    });
 
     socket.on('joinRoom', ({ roomId, name } = {}) => {
       const normalizedRoomId = String(roomId || '').trim();
       const normalizedName = String(name || '').trim();
 
       if (!normalizedRoomId || !normalizedName) {
+        logger.error('Join room validation failed', {
+          socketId: socket.id,
+          roomId: normalizedRoomId,
+        });
         socket.emit('error', 'roomId and name are required.');
         return;
       }
@@ -123,6 +130,10 @@ module.exports = (io) => {
 
       try {
         if (session.status === 'playing') {
+          logger.info('Join rejected while round is in progress', {
+            socketId: socket.id,
+            roomId: normalizedRoomId,
+          });
           socket.emit('error', 'You cannot join while a game is in progress.');
           return;
         }
@@ -130,6 +141,12 @@ module.exports = (io) => {
         session.addPlayer({ id: socket.id, name: normalizedName });
         socket.join(normalizedRoomId);
         socketRooms[socket.id] = normalizedRoomId;
+        logger.info('Player joined room', {
+          socketId: socket.id,
+          roomId: normalizedRoomId,
+          playerName: normalizedName,
+          playerCount: session.players.length,
+        });
 
         emitRoomState(io, normalizedRoomId);
 
@@ -137,6 +154,11 @@ module.exports = (io) => {
           emitNewMasterAssigned(io, normalizedRoomId, session);
         }
       } catch (err) {
+        logger.error('Join room failed', {
+          socketId: socket.id,
+          roomId: normalizedRoomId,
+          error: err.message,
+        });
         socket.emit('error', err.message);
       }
     });
@@ -146,21 +168,39 @@ module.exports = (io) => {
       const session = getSession(normalizedRoomId);
 
       if (!session) {
+        logger.error('Start game failed because session was not found', {
+          socketId: socket.id,
+          roomId: normalizedRoomId,
+        });
         socket.emit('error', 'Session not found.');
         return;
       }
 
       if (socket.id !== session.getCurrentMaster()?.id) {
+        logger.info('Start game rejected for non-master player', {
+          socketId: socket.id,
+          roomId: normalizedRoomId,
+        });
         socket.emit('error', 'Only the Master can start the game.');
         return;
       }
 
       try {
         session.startRound(question, answer);
+        logger.info('Game started', {
+          socketId: socket.id,
+          roomId: normalizedRoomId,
+          playerCount: session.players.length,
+        });
         io.to(normalizedRoomId).emit('gameStarted', session.getPublicState());
         emitRoomState(io, normalizedRoomId);
         startRoundTimer(io, normalizedRoomId);
       } catch (err) {
+        logger.error('Start game failed', {
+          socketId: socket.id,
+          roomId: normalizedRoomId,
+          error: err.message,
+        });
         socket.emit('error', err.message);
       }
     });
@@ -176,6 +216,12 @@ module.exports = (io) => {
       try {
         const player = session.getPlayerById(socket.id);
         const result = session.submitGuess(socket.id, guess);
+        logger.debug('Guess submitted', {
+          socketId: socket.id,
+          roomId: normalizedRoomId,
+          playerName: player?.name || 'Unknown Player',
+          outcome: result.outcome,
+        });
 
         io.to(normalizedRoomId).emit('chatMessage', {
           sender: player?.name || 'Unknown Player',
@@ -189,13 +235,26 @@ module.exports = (io) => {
         });
 
         if (result.outcome === 'correct') {
+          logger.info('Round won by player', {
+            socketId: socket.id,
+            roomId: normalizedRoomId,
+            winner: result.winner,
+          });
           endRoundAndRotate(io, normalizedRoomId, `${result.winner} got it right!`);
         } else if (session.status === 'ended') {
+          logger.info('Round ended with all attempts exhausted', {
+            roomId: normalizedRoomId,
+          });
           endRoundAndRotate(io, normalizedRoomId, 'All attempts exhausted.');
         } else {
           emitRoomState(io, normalizedRoomId);
         }
       } catch (err) {
+        logger.error('Submit guess failed', {
+          socketId: socket.id,
+          roomId: normalizedRoomId,
+          error: err.message,
+        });
         socket.emit('error', err.message);
       }
     });
@@ -204,7 +263,9 @@ module.exports = (io) => {
       const roomId = socketRooms[socket.id];
 
       if (!roomId) {
-        console.log(`User Disconnected: ${socket.id}`);
+        logger.info('Socket disconnected without room', {
+          socketId: socket.id,
+        });
         return;
       }
 
@@ -212,7 +273,10 @@ module.exports = (io) => {
       delete socketRooms[socket.id];
 
       if (!session) {
-        console.log(`User Disconnected: ${socket.id}`);
+        logger.info('Socket disconnected after session was already unavailable', {
+          socketId: socket.id,
+          roomId,
+        });
         return;
       }
 
@@ -221,14 +285,26 @@ module.exports = (io) => {
       const removedPlayer = session.removePlayer(socket.id);
 
       if (!removedPlayer) {
-        console.log(`User Disconnected: ${socket.id}`);
+        logger.info('Socket disconnected but player was not found in room', {
+          socketId: socket.id,
+          roomId,
+        });
         return;
       }
+
+      logger.info('Player disconnected from room', {
+        socketId: socket.id,
+        roomId,
+        playerName: removedPlayer.name,
+        remainingPlayers: session.players.length,
+      });
 
       if (session.players.length === 0) {
         clearRoomTimer(roomId);
         delete sessions[roomId];
-        console.log(`User Disconnected: ${socket.id}`);
+        logger.info('Session deleted after last player left', {
+          roomId,
+        });
         return;
       }
 
@@ -244,6 +320,10 @@ module.exports = (io) => {
       emitRoomState(io, roomId);
 
       if (wasPlaying && session.status === 'waiting') {
+        logger.info('Round cancelled after disconnect reduced room below minimum players', {
+          roomId,
+          remainingPlayers: session.players.length,
+        });
         io.to(roomId).emit('roundCancelled', {
           reason: 'Round cancelled because there are no longer enough players to continue.',
           state: session.getPublicState(),
@@ -254,7 +334,10 @@ module.exports = (io) => {
         emitNewMasterAssigned(io, roomId, session);
       }
 
-      console.log(`User Disconnected: ${socket.id}`);
+      logger.info('Socket disconnected', {
+        socketId: socket.id,
+        roomId,
+      });
     });
   });
 };
